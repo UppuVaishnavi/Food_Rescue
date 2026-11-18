@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Find and claim surplus food shared with FoodRescue.">
+    <title>FoodRescue | Find Food</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="donations-page">
+    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top shadow-sm">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/"><span class="brand-icon">🍃</span> FoodRescue</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#donationsNavbar" aria-controls="donationsNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="donationsNavbar">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
+                    {% if current_user %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('account') }}">My dashboard</a></li>
+                        {% if current_user["role"] == "donor" %}
+                            <li class="nav-item ms-lg-2"><a href="{{ url_for('create_donation') }}" class="btn btn-success px-4">Share food</a></li>
+                        {% endif %}
+                    {% else %}
+                        <li class="nav-item ms-lg-3 mt-2 mt-lg-0"><a href="{{ url_for('login') }}" class="btn btn-outline-success px-4">Login</a></li>
+                        <li class="nav-item ms-lg-2 mt-2 mt-lg-0"><a href="{{ url_for('register') }}" class="btn btn-success px-4">Join FoodRescue</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="donations-hero">
+            <div class="container">
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-8">
+                        <span class="donations-eyebrow">GOOD FOOD, SHARED LOCALLY</span>
+                        <h1>Find food. <span>Make a difference.</span></h1>
+                        <p>Browse available food shared by donors. Recipients and volunteers can claim a listing and coordinate pickup directly with the donor.</p>
+                    </div>
+                    <div class="col-lg-4 text-lg-end">
+                        {% if current_user and current_user["role"] == "donor" %}
+                            <a href="{{ url_for('create_donation') }}" class="btn btn-light btn-lg">Share surplus food</a>
+                        {% elif not current_user %}
+                            <a href="{{ url_for('register') }}" class="btn btn-light btn-lg">Join the community</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="donations-content section-padding">
+            <div class="container">
+                <div class="demo-notice" role="note">
+                    <span aria-hidden="true">ℹ️</span>
+                    <p><strong>5 sample listings are included.</strong> Sample records demonstrate claiming and pickup status; they do not represent real food. Listings shared by registered donors are marked as live.</p>
+                </div>
+
+                <div class="donations-heading">
+                    <div>
+                        <span class="section-label">AVAILABLE FOOD</span>
+                        <h2>Explore donations</h2>
+                    </div>
+                    <p id="donationResultCount" class="result-count" aria-live="polite">Showing {{ donations|length }} donations</p>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} mt-3" role="alert">{{ message }}</div>
+                    {% endfor %}
+                {% endwith %}
+
+                <div class="filter-panel row g-3 align-items-end">
+                    <div class="col-lg-7">
+                        <label for="donationSearch" class="form-label">Search by food, donor, or location</label>
+                        <input type="search" class="form-control" id="donationSearch" placeholder="Try “produce” or “northside”">
+                    </div>
+                    <div class="col-sm-8 col-lg-3">
+                        <label for="donationCategory" class="form-label">Food category</label>
+                        <select class="form-select" id="donationCategory">
+                            <option value="all">All categories</option>
+                            {% for category, label in categories.items() %}
+                                <option value="{{ category }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-sm-4 col-lg-2">
+                        <button type="button" class="btn btn-outline-success w-100" id="clearDonationFilters">Clear filters</button>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-2" id="donationList">
+                    {% for donation in donations %}
+                        <div class="col-md-6 col-xl-4 donation-item">
+                            <article class="donation-card h-100" data-category="{{ donation['category'] }}">
+                                <div class="donation-art donation-art-{{ donation['category'] }}">
+                                    <img class="donation-photo" src="{{ donation['image_url'] or images[donation['category']] }}" alt="{{ donation['title'] }} shared by {{ donation['donor_name'] }}" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+                                    <span class="donation-emoji" aria-hidden="true">
+                                        {% if donation["category"] == "produce" %}🥕
+                                        {% elif donation["category"] == "prepared" %}🥗
+                                        {% elif donation["category"] == "bakery" %}🥖
+                                        {% elif donation["category"] == "pantry" %}🥫
+                                        {% else %}🍱{% endif %}
+                                    </span>
+                                    <span class="example-badge">{{ "Sample" if donation["is_sample"] else "Live" }}</span>
+                                </div>
+                                <div class="donation-card-body">
+                                    <span class="donation-category">{{ categories[donation["category"]] }}</span>
+                                    <h3>{{ donation["title"] }}</h3>
+                                    <p class="donation-donor">{{ donation["donor_name"] }}</p>
+                                    <ul class="donation-facts">
+                                        <li><span>Quantity</span><strong>{{ donation["quantity"] }}</strong></li>
+                                        <li><span>Pickup area</span><strong>{{ donation["pickup_location"] }}</strong></li>
+                                        <li><span>Pickup window</span><strong>{{ donation["pickup_window"] }}</strong></li>
+                                    </ul>
+                                    <div class="donation-card-actions">
+                                        <button type="button" class="btn btn-outline-success donation-details-button"
+                                                data-listing-details data-bs-toggle="modal" data-bs-target="#donationDetailsModal"
+                                                data-title="{{ donation['title'] }}" data-category="{{ categories[donation['category']] }}"
+                                                data-donor="{{ donation['donor_name'] }}" data-quantity="{{ donation['quantity'] }}"
+                                                data-location="{{ donation['pickup_location'] }}" data-pickup="{{ donation['pickup_window'] }}"
+                                                data-description="{{ donation['description'] }}" data-sample="{{ donation['is_sample'] }}">
+                                            Details
+                                        </button>
+                                        {% if current_user and current_user["role"] in ("recipient", "volunteer") %}
+                                            <form method="post" action="{{ url_for('claim_donation', donation_id=donation['id']) }}">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-success">Claim food</button>
+                                            </form>
+                                        {% elif not current_user %}
+                                            <a href="{{ url_for('login') }}" class="btn btn-success">Log in to claim</a>
+                                        {% else %}
+                                            <span class="donor-only-note">Recipients and volunteers can claim</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </article>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div id="noDonationsFound" class="no-results {% if donations %}d-none{% endif %}" role="status">
+                    <div aria-hidden="true">🔎</div>
+                    <h3>No matching donations</h3>
+                    <p>Try another search term or choose a different category.</p>
+                    {% if not donations and current_user and current_user["role"] == "donor" %}
+                        <a href="{{ url_for('create_donation') }}" class="btn btn-success">Share the first listing</a>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
+            <div>
+                <h4>🍃 FoodRescue</h4>
+                <p>Save Food. Share Hope. Make a Difference.</p>
+            </div>
+            <p>Donor contact details are shared only after a listing is claimed.</p>
+        </div>
+    </footer>
+
+    <div class="modal fade" id="donationDetailsModal" tabindex="-1" aria-labelledby="donationModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content donation-modal">
+                <div class="modal-header">
+                    <div>
+                        <span class="donation-category" id="donationModalCategory"></span>
+                        <h2 class="modal-title fs-5 mt-1" id="donationModalTitle"></h2>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="donationModalDescription"></p>
+                    <dl class="modal-facts">
+                        <div><dt>Donor</dt><dd id="donationModalDonor"></dd></div>
+                        <div><dt>Quantity</dt><dd id="donationModalQuantity"></dd></div>
+                        <div><dt>Pickup area</dt><dd id="donationModalLocation"></dd></div>
+                        <div><dt>Pickup window</dt><dd id="donationModalPickup"></dd></div>
+                    </dl>
+                    <p class="modal-demo-note" id="donationModalNote"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/donations.js') }}"></script>
+</body>
+</html>
